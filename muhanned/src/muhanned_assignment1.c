@@ -53,9 +53,11 @@ struct host {
 	int num_msg_rcv;
 	//char* status;
 	int fd;
+	//int sent;
+	//int rec;
 	//struct host * blocked;
 	//struct host * next_host;
-	bool is_logged_in;
+	bool logged_in;
 	bool is_server;
 	bool is_initialized;
 	//struct message * queued_messages;
@@ -75,9 +77,20 @@ struct client {
 };
 
 int connect_to_host(char *server_ip, char *server_port);
-
-/**
- * main function
+void sort(struct host clients[BACKLOG-1]){
+	int l = BACKLOG-1;
+	int i , j;
+	for(i=0;i<l;i++){
+		for(j=i+1;j<l;j++){
+			if(clients[i].port_num>clients[j].port_num){
+				struct host temp = clients[i];
+				clients[i]=clients[j];
+				clients[j]=temp;	
+			}
+		}
+	}
+} 
+/* * main function
  *
  * @param  argc Number of arguments
  * @param  argv The argument list
@@ -151,9 +164,11 @@ int main(int argc, char **argv)
 		clients[i].num_msg_sent = 0;
 		clients[i].num_msg_rcv = 0;
 		clients[i].fd = 0;
-		clients[i].is_logged_in = false;
+		clients[i].logged_in = false;
 		clients[i].is_server = false;
 		clients[i].is_initialized = false;
+//		clients[i].sent=0
+//		clients[i].rcv=0;
 	}
 	
 	if (*argv[1] == 's') {
@@ -249,9 +264,51 @@ int main(int argc, char **argv)
                                 				cse4589_print_and_log("[PORT:SUCCESS]\n");
                                 				cse4589_print_and_log("PORT:%s\n", host_port);
                                 				cse4589_print_and_log("[PORT:END]\n");
-                        				}
-							free(cmd);
-						}
+                        				
+							}
+							char statistics[] = "STATISTICS\n";
+							if(strcmp(cmd,statistics)==0){
+								cse4589_print_and_log("STATISTICS:SUCCESS]\n");
+								int seq=0;
+								for(int i =0;i<BACKLOG-1;i++){
+									if(clients[i].is_initialized){
+										char *status = (char*) malloc(sizeof(char)*MAXDATASIZE);
+										if(clients[i].logged_in){
+											strcpy(status,"logged-in");
+										}
+										else strcpy(status,"logged-out");
+										seq++;
+										cse4589_print_and_log("%-5d%-35s%-8d%-8d%-8s\n",seq,clients[i].hostname,clients[i].num_msg_sent,clients[i].num_msg_rcv,status);
+									}
+							
+								}
+								cse4589_print_and_log("[STATISTICS:END]:\n");	
+							}
+							char list[] = "LIST\n";
+							if (strcmp(cmd,list)==0){
+							//	printf("Inside litst bro");
+							//	char[] command_str = "LIST";
+								cse4589_print_and_log("[LIST:SUCCESS]\n");
+								int l = BACKLOG-1,i=0,j=0;
+								for(int i = 0 ; i < l;i++){
+									for(int j = i+1;j<l;j++){
+										if(atoi(clients[i].port_num)>(clients[j].port_num)){
+											struct host temp = clients[i];
+											clients[i]=clients[j];
+											clients[j]=temp;
+											}
+									}
+								}
+								int seq=0;
+								for(int i = 0 ; i < BACKLOG - 1 ;i++){
+									if(clients[i].is_initialized && clients[i].logged_in){
+										seq++;
+										cse4589_print_and_log("%-5d%-35s%-20s%-8d\n",seq,clients[i].hostname,clients[i].ip_addr,atoi(clients[i].port_num));		
+									}	
+								}
+								cse4589_print_and_log("[LIST:END]\n");	
+							}
+							free(cmd);						}
 						/* Check if new client is requesting connection */
 						else if(sock_index == server_socket){
 							caddr_len = sizeof(client_addr);
@@ -272,7 +329,7 @@ int main(int argc, char **argv)
 									clients[i].hostname = client_hostname;
 									clients[i].fd = fdaccept;
 									//printf("client fd: %d\n", fdaccept);
-									clients[i].is_logged_in = true;
+									clients[i].logged_in = true;
 									clients[i].is_server = false;
 									clients[i].is_initialized = false;
 									break;
@@ -284,14 +341,24 @@ int main(int argc, char **argv)
 							/* Add to watched socket list */
 							FD_SET(fdaccept, &master_list);
 							if(fdaccept > head_socket) head_socket = fdaccept;
-							char *keep_adding = (char*) malloc(sizeof(char)*MAXDATASIZE);
-							memset(keep_adding,'\0',MAXDATASIZE);
-						        send(fdaccept,"One message is just sent for now ",4,0);
-						/*	for(int i=0;i<BACKLOG-1;i++){
+							//char *keep_adding = (char*) malloc(sizeof(char)*MAXDATASIZE);
+							//memset(keep_adding,'\0',MAXDATASIZE);
+						        char* ip = (char*) malloc (sizeof(char)*MAXDATASIZE);
+							memset(ip,'\0',	MAXDATASIZE);
+							//send(fdaccept,"One message is just sent for now ",4,0);
+							for(int i=0;i<BACKLOG-1;i++){
+							//	printf(i);
 								if(clients[i].is_initialized && clients[i].fd != fdaccept){
-									
+									char *temp = (char*) malloc (sizeof(char)*MAXDATASIZE);
+							//		printf(i);
+									//	memset(ip,'\0',MAXDATASIZE);
+									sprintf(temp,"%s %s %d ",clients[i].ip_addr,clients[i].port_num,clients[i].fd);
+									printf(temp);
+									strcat(ip,temp);
+								//	send(fdaccept,ip,strlen(ip),0);	
 								}
-							}	/*/	
+							}	
+							send(fdaccept,ip,strlen(ip),0);	
 							/*	for (int i = 0; i < BACKLOG - 1; i++) {
 								//if(clients[i].is_initialized && clients[i].fd == fdaccept) send(fdaccept,"123",3,0);	
 								 	if (clients[i].is_initialized && clients[i].fd != fdaccept) {
@@ -395,7 +462,10 @@ int main(int argc, char **argv)
 										printf("hostname: %s\n", clients[i].hostname);
 										printf("ip_addr: %s\n", clients[i].ip_addr);
 										printf("port_num: %s\n", clients[i].port_num);
-										printf("------------------\n");	
+										printf("------------------\n");
+									//	clients[i].sent=0;
+									//	clients[i].rcv=0;
+									//	clients[i].logged_in=true;	
 									}
 								}
 
@@ -469,7 +539,14 @@ int main(int argc, char **argv)
 				cse4589_print_and_log("PORT:%s\n", host_port);
 				cse4589_print_and_log("[PORT:END]\n");
 			}
-
+			char msend[] = "SEND\n";
+			if(strstr(msg,msend)==NULL){
+				send(server,msg,strlen(msg),0);
+                        }
+			char logout[] = "LOGOUT\n";
+			if(strcmp(msg,logout)==0){
+				close(server);	
+			}
 			char login[] = "LOGIN\n";
 			if(strstr(msg, login) == NULL) {
     				char* server_ip_addr;
@@ -483,6 +560,9 @@ int main(int argc, char **argv)
 				//printf("server_ip_addr: %s\n", server_ip_addr);
 				//printf("server_ip_addr len: %d\n", strlen(server_ip_addr));
 				server_port = strtok(NULL, delim);
+			//	for(int i=0;i<BACKLOG-1;i++){
+			//		if(clients[i]	
+			//	}	
 				//printf("host port: %s\n", host_port);
 				//printf("host port len: %d\n", strlen(host_port));
 				//printf("server_port: %s\n", server_port);
