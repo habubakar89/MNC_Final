@@ -260,7 +260,7 @@ int main(int argc, char **argv)
                         				}
 
 							char port[] = "PORT\n";
-                        				if (strcmp(cmd, port) == 0) {
+                      				if (strcmp(cmd, port) == 0) {
                                 				cse4589_print_and_log("[PORT:SUCCESS]\n");
                                 				cse4589_print_and_log("PORT:%s\n", host_port);
                                 				cse4589_print_and_log("[PORT:END]\n");
@@ -276,13 +276,13 @@ int main(int argc, char **argv)
 										if(clients[i].logged_in){
 											strcpy(status,"logged-in");
 										}
-										else strcpy(status,"logged-out");
+										else if(!clients[i].logged_in) strcpy(status,"logged-out");
 										seq++;
 										cse4589_print_and_log("%-5d%-35s%-8d%-8d%-8s\n",seq,clients[i].hostname,clients[i].num_msg_sent,clients[i].num_msg_rcv,status);
 									}
 							
 								}
-								cse4589_print_and_log("[STATISTICS:END]:\n");	
+								cse4589_print_and_log("[STATISTICS:END]\n");	
 							}
 							char list[] = "LIST\n";
 							if (strcmp(cmd,list)==0){
@@ -344,7 +344,10 @@ int main(int argc, char **argv)
 							//char *keep_adding = (char*) malloc(sizeof(char)*MAXDATASIZE);
 							//memset(keep_adding,'\0',MAXDATASIZE);
 						        char* ip = (char*) malloc (sizeof(char)*MAXDATASIZE);
+							
+
 							memset(ip,'\0',	MAXDATASIZE);
+							strcat(ip,"Message ");
 							//send(fdaccept,"One message is just sent for now ",4,0);
 							for(int i=0;i<BACKLOG-1;i++){
 							//	printf(i);
@@ -419,6 +422,9 @@ int main(int argc, char **argv)
 							memset(buffer, '\0', BUFFER_SIZE);
 
 							if(recv(sock_index, buffer, BUFFER_SIZE, 0) <= 0){
+								for(int i =0;i<BACKLOG-1;i++){
+									if(clients[i].fd == sock_index) clients[i].logged_in=false;
+								}
 								close(sock_index);
 								printf("Remote Host terminated connection!\n");
 
@@ -545,8 +551,17 @@ int main(int argc, char **argv)
                         }
 			char logout[] = "LOGOUT\n";
 			if(strcmp(msg,logout)==0){
+				cse4589_print_and_log("[LOGOUT:SUCCESS]\n");
 				close(server);	
+				cse4589_print_and_log("[LOGOUT:END\n");
 			}
+			char exit[] = "EXIT\n";
+ 			if(strcmp(msg,exit)==0){
+				cse4589_print_and_log("[EXIT:SUCCESS]\n");
+				close(server);
+				cse4589_print_and_log("[EXIT:END]\n");
+				exit(0);
+			}	
 			char login[] = "LOGIN\n";
 			if(strstr(msg, login) == NULL) {
     				char* server_ip_addr;
