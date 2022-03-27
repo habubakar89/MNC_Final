@@ -268,7 +268,7 @@ int main(int argc, char **argv)
 							}
 							char statistics[] = "STATISTICS\n";
 							if(strcmp(cmd,statistics)==0){
-								cse4589_print_and_log("STATISTICS:SUCCESS]\n");
+								cse4589_print_and_log("[STATISTICS:SUCCESS]\n");
 								int seq=0;
 								for(int i =0;i<BACKLOG-1;i++){
 									if(clients[i].is_initialized){
@@ -292,7 +292,7 @@ int main(int argc, char **argv)
 								int l = BACKLOG-1,i=0,j=0;
 								for(int i = 0 ; i < l;i++){
 									for(int j = i+1;j<l;j++){
-										if(atoi(clients[i].port_num)>(clients[j].port_num)){
+										if(atoi(clients[i].port_num)>atoi((clients[j].port_num))){
 											struct host temp = clients[i];
 											clients[i]=clients[j];
 											clients[j]=temp;
@@ -434,7 +434,7 @@ int main(int argc, char **argv)
 							else {
 								//Process incoming data from existing clients here ...
 
-								//printf("\nClient sent me: %s\n", buffer);
+								printf("\nClient sent me: %s\n", buffer);
 								for (int i = 0; i < BACKLOG - 1; i++) {
 									if(clients[i].fd == fdaccept && (!clients[i].is_initialized)) {
 										char *client_ip = (char*) malloc(sizeof(char)*MAXDATASIZE);
@@ -560,8 +560,45 @@ int main(int argc, char **argv)
 				cse4589_print_and_log("[EXIT:SUCCESS]\n");
 				close(server);
 				cse4589_print_and_log("[EXIT:END]\n");
-				exit(0);
-			}	
+			//	exit(0);
+			}
+			char send_file="SENDFILE\n";
+			if(strstr(msg,send_file)==NULL){
+				char* ip_address;
+				char* temp = (char*) malloc(sizeof(char)*MSG_SIZE);
+				char* filename = (char*) malloc(sizeof(char)*MSG_SIZE);
+				char delim[] = " ";
+				temp = strtok(msg,delim);
+				ip_address=strtok(NULL,delim);
+				char* file_name=strtok(NULL,delim);
+				FILE *fp=fopen(filename,"r");
+			//	file_send(fp,server);
+			}
+			char refresh[] = "REFRESH\n";
+			char list[] = "LIST\n";
+			if(strcmp(msg,list)==0 || strcmp(msg,refresh)==0){
+				if(strcmp(msg,refresh)==0) cse4589_print_and_log("[REFRESH:SUCCESS]\n");
+		        	else if(strcmp(msg,list)==0) cse4589_print_and_log("LIST:SUCCESS]\n"); 
+				int l=BACKLOG-1,i=0,j=0;
+				for(int i = 0 ; i <l;i++){
+					for(int j =i+1;j<l;j++){
+						if(atoi(clients[i].port_num)>atoi(clients[j].port_num)){
+							struct host temp = clients[i];
+							clients[i]=clients[j];
+							clients[j]=temp;
+						}
+					}
+				}
+				int seq=0;
+				for(int i =0;i<BACKLOG-1;i++){
+					if(clients[i].is_initialized && clients[i].logged_in){
+						seq++;
+						cse4589_print_and_log("%-5d%-35s%-20s%-8d\n",seq,clients[i].hostname,clients[i].ip_addr,atoi(clients[i].port_num));
+					}
+				} 
+				if(strcmp(msg,refresh)==0) cse4589_print_and_log("[REFRESH:END]\n");
+		   		else if(strcmp(msg,list)==0) cse4589_print_and_log("[LIST:END]\n"); 
+			}
 			char login[] = "LOGIN\n";
 			if(strstr(msg, login) == NULL) {
     				char* server_ip_addr;
@@ -601,10 +638,12 @@ int main(int argc, char **argv)
 				//for (int i = 0; i < BACKLOG - 2; i++) {
 				char *buffer = (char*) malloc(sizeof(char)*BUFFER_SIZE);
 				memset(buffer, '\0', BUFFER_SIZE);
-				printf("before recv\n");
+			//	printf("before recv\n");
 				if(recv(server, buffer, BUFFER_SIZE, 0) >= 0){
-						
-				printf("Server responded: %s", buffer);
+		//		if(!(strstr(buffer,"SEND")==NULL || strstr(buffer,"BROADCAST")==NULL)) file_get(server,buffer);
+				
+				//printf("Server responded: %s", buffer);
+				//
 				/*	char curr_client_info_string[] = "client_info";
 					if (strstr(buffer, curr_client_info_string) == NULL) {
 						char* recv_curr_client_info = (char*) malloc(sizeof(char)*MSG_SIZE);
@@ -634,7 +673,33 @@ int main(int argc, char **argv)
 	}
 	return 0;
 }
+void send_file(FILE *fp,int socket){
+	char temp[MSG_SIZE]={0};
+	while(fgets(temp,MSG_SIZE,fp)!=NULL){
+		send(socket,temp,strlen(temp),0);
+		bzero(temp,MSG_SIZE);
+	}
+} 
+void file_get(int socket,char *buffer){
+	int n;
+	FILE *fp;
+	char *name="dest.text";
+	char temp[MSG_SIZE];	
+	fp=fopen(name,"w");
+	fprintf(fp,"%s",buffer);
+	while(1){
+		n=recv(socket,temp,MSG_SIZE,0);
+		if(n>=0){
+			break;
+			return;
+		}
+		fprintf(fp,"%s",temp);
+		bzero(temp,MSG_SIZE);
 
+	}
+	return;	
+//	char temp[MSG_SIZE];	
+} 
 int connect_to_host(char *server_ip, char* server_port)
 {
 	int fdsocket;
